@@ -7,15 +7,13 @@
 
 */
 
-------create DG Budget table - unpivot version in Googlesheet (note currently only has columns to end 2016)
+-- DG BUDGET TABLE - GoogleSheets
 
 DELETE
 FROM
   `crowdriff-revops`.`bi_business`.`DG_Qtr_CampaignBudget`
 WHERE
   TRUE;
-
-  
 INSERT 
 `crowdriff-revops`.`bi_business`.`DG_Qtr_CampaignBudget`
 
@@ -36,6 +34,7 @@ UNPIVOT INCLUDE NULLS (Budget for Fiscalyyyyq in (FY2023_Q1,FY2023_Q2,FY2023_Q3,
 Join `crowdriff-revops`.`bi_business`.`calendar_standard` as c on b.Fiscalyyyyq = c.Fiscalyyyyq and IsFiscalQuarterEnd is True ;
 
 -- FACEBOOK
+
 DELETE FROM `crowdriff-revops`.`bi_business`.`ad_analytics_weekly` WHERE TRUE;
 INSERT  `crowdriff-revops`.`bi_business`.`ad_analytics_weekly`
 
@@ -514,6 +513,7 @@ h.CampaignStage
 ;
 
 -- LINKEDIN
+
 INSERT  `crowdriff-revops`.`bi_business`.`ad_analytics_weekly`
 
 With tmp_extract_date as
@@ -559,7 +559,7 @@ left join (select distinct * from `crowdriff-revops.bi_business.DG_Qtr_CampaignB
   left join (select distinct * from `crowdriff-revops.bi_business.DG_Qtr_CampaignBudget` where FiscalQuarterEnd is null and coalesce(Budget_CAD,0) = 0) as cb2 on cb2.HSCampaignName = h.AdCampaignName and cb.FiscalQuarterEnd is null
 )
 
- SELECT  
+SELECT  
 CalendarWeekStart, 
 CalendarWeekEnd,  
 CalendarMonthStart,
@@ -690,8 +690,8 @@ h.CampaignProductLine,
 h.CampaignStage
  ; 
 
-----  google ads --- total performance
----only extract data for the latest date per campaign
+-- GOOGLE ADS - TOTAL
+
 INSERT  `crowdriff-revops`.`bi_business`.`ad_analytics_weekly`
 
 With tmp_extract_date as
@@ -700,6 +700,7 @@ Select date,campaign_id,max(_sdc_received_at) as last_campaign_extract,
 from  `crowdriff-revops.raw_googleads.ad_performance_report` 
 group by date,campaign_id
 ) 
+
 
 SELECT  
 CalendarWeekStart, 
