@@ -514,12 +514,50 @@ h.CampaignStage
 ;
 
 -- LINKEDIN
-
 INSERT  `crowdriff-revops`.`bi_business`.`ad_analytics_weekly`
 
 With tmp_extract_date as
 (Select max(date(end_at)) as LastExtract
-FROM `crowdriff-revops.raw_linkedin_new.ad_analytics_by_creative`) 
+FROM `crowdriff-revops.raw_linkedin_new.ad_analytics_by_creative`), 
+
+Campaign_Breakdown as
+(Select 
+c.name,
+ Case when h.HSCampaignName is not null then h.HSCampaignName
+when lower(c.name) like '%event%' and lower(c.name) like '%mqp%' then 'Other Events'
+when lower(c.name) like '%demo%' or lower(c.name) like '%pricing%' then 'Other Demo Requests' 
+when lower(c.name) like '%ebook%' or  lower(c.name) like '%download%' or lower(c.name) like '%content%'  or lower(c.name) like '%resources%' or  lower(c.name) like '%report%' or  lower(c.name) like '%masterclass%' or lower(c.name) like '%webinar recording%' or lower(c.name) like '%guide%' then 'Other Content Downloads' 
+when lower(c.name) like '%webinar%' or lower(c.name) like '%registration form%' then 'Other Webinar Registrations'
+when lower(c.name) like '%contact us%' then 'Contact Us' end as CampaignName,
+
+  Case when h.HSCampaignName is not null then h.HSCampaignType
+when lower(c.name) like '%event%' and lower(c.name) like '%mqp%' then 'BOFU'
+when lower(c.name) like '%demo%' or lower(c.name) like '%pricing%' then 'BOFU' 
+when lower(c.name) like '%ebook%' or  lower(c.name) like '%download%' or lower(c.name) like '%content%'  or lower(c.name) like '%resources%' or  lower(c.name) like '%report%' or  lower(c.name) like '%masterclass%' or lower(c.name) like '%webinar recording%' or lower(c.name) like '%guide%' then 'MOFU' 
+when lower(c.name) like '%webinar%' or lower(c.name) like '%registration form%' then 'MOFU'
+when lower(c.name) like '%contact us%' then 'BOFU' end as CampaignType,
+
+Case when coalesce(cb.HSCampaignName,cb2.HSCampaignName) is not null then 1 
+when (lower(c.name) like '%event%' and lower(c.name) like '%mqp%') or
+lower(c.name) like '%demo%' or lower(c.name) like '%pricing%' or
+lower(c.name) like '%ebook%' or  lower(c.name) like '%download%' or lower(c.name) like '%content%'  or lower(c.name) like '%resources%' or  lower(c.name) like '%report%' or  lower(c.name) like '%masterclass%' or lower(c.name) like '%webinar recording%' or lower(c.name) like '%guide%' or
+lower(c.name) like '%webinar%' or lower(c.name) like '%registration form%' or
+lower(c.name) like '%contact us%' then 1
+end as IsTrackedCampaign,
+cb.FiscalQuarterEnd as CampaignQuarterEndDate,
+coalesce(cb.ProductLine,cb2.ProductLine, 'UnMapped') as CampaignProductLine,
+Case when coalesce(cb.Stage, cb2.Stage)  is not null then coalesce(cb.Stage, cb2.Stage) 
+when lower(c.name) like '%event%' and lower(c.name) like '%mqp%' then 'BOFU'
+when lower(c.name) like '%demo%' or lower(c.name) like '%pricing%' then 'BOFU' 
+when lower(c.name) like '%ebook%' or  lower(c.name) like '%download%' or lower(c.name) like '%content%'  or lower(c.name) like '%resources%' or  lower(c.name) like '%report%' or  lower(c.name) like '%masterclass%' or lower(c.name) like '%webinar recording%' or lower(c.name) like '%guide%' then 'MOFU' 
+when lower(c.name) like '%webinar%' or lower(c.name) like '%registration form%' then 'MOFU'
+when lower(c.name) like '%contact us%' then 'BOFU' end as CampaignStage
+FROM `crowdriff-revops.raw_linkedin_new.campaigns`  as c
+left join
+(select distinct * from `crowdriff-revops`.`bi_business`.`HSCampaignMapping`) as h  on c.name = h.AdCampaignName 
+left join (select distinct * from `crowdriff-revops.bi_business.DG_Qtr_CampaignBudget` where FiscalQuarterEnd is not null) as cb on cb.HSCampaignName = h.AdCampaignName   and cb.FiscalQuarterEnd = d.FiscalQuarterEnd 
+  left join (select distinct * from `crowdriff-revops.bi_business.DG_Qtr_CampaignBudget` where FiscalQuarterEnd is null and coalesce(Budget_CAD,0) = 0) as cb2 on cb2.HSCampaignName = h.AdCampaignName and cb.FiscalQuarterEnd is null
+)
 
  SELECT  
 CalendarWeekStart, 
@@ -539,9 +577,6 @@ LastExtract,
 'Total' as Breakdown,
 'Linkedin'  as Level1,
 '' as Level2,
------CalendarDate, 
-------cg.name as CampaignGroup, 
---------campaign_group_id as CampaignGroupId, 
 coalesce(h.HSCampaignName,c.name) as CampaignName, 
 campaign_id as CampaignId, 
 '' as AdsetName, 
@@ -554,7 +589,6 @@ cost_type as CostType,
 creative_selection as CreativeSelection,
 v.type as AdType,
 '' as CallToActionType,
-----Case when publisher.value = 'facebook' then 'Facebook' end,
 '' as CustomEventType,
 sum(impressions) as Impressions, 
 sum(approximate_unique_impressions) as Reach, 
@@ -572,25 +606,8 @@ null as LifetimeBudget,
 null as BudgetRemaining,
 null as SpendCap,
 sum(conversion_value_in_local_currency) as ConversionValue_CAD,
------unit_cost.amount as UnitCost_CAD,
-/* these are all caluclated metrics
-safe_divide(impressions,reach) as frequency1,
-frequency, 
-safe_divide(clicks,impressions)*100 as ctr1,
-ctr,
-safe_divide(unique_clicks,reach)*100 as u_ctr1,
-unique_ctr, 
-safe_divide(inline_link_clicks,impressions)*100 as in_link_ctr, 
-inline_link_click_ctr,
-------safe_divide(inline_link_clicks,reach)*100 as u_in_link_ctr,
-unique_inline_link_click_ctr, 
-safe_divide(unique_inline_link_clicks,reach)*100 as u_in_link_ctr1,
-unique_inline_link_click_ctr, 
------unique_link_clicks_ctr, 
-safe_divide(inline_post_engagement,impressions)*100 as inpost_ctr,
-*/
 sum(comments) as ActionsComment,
-sum(external_website_post_click_conversions) as ActionConversion, ------sum(external_website_conversions) as ActionConversion,
+sum(external_website_post_click_conversions) as ActionConversion, 
 sum(one_click_lead_form_opens) as ActionsCompleteRegistration, 
 sum(landing_page_clicks) as ActionsLandingPageView, 
 sum(one_click_leads) as ActionsLead, 
@@ -598,20 +615,18 @@ sum(likes) as ActionsLike,
 sum(landing_page_clicks + company_page_clicks) as ActionsLinkClick, 
 null as ActionsOutboundClick, 
 null as ActionsOffsiteConversionCustom, 
-sum(company_page_clicks) as ActionsPageEngagement, -----other_engagements, total_engagements as ActionsPageEngagement, 
+sum(company_page_clicks) as ActionsPageEngagement, 
 null as ActionsPost, 
 sum(total_engagements) as ActionsPostEngagement, 
 sum(reactions) as ActionsPostReaction,
 null asActionsPostSave,  
 sum(external_website_post_view_conversions) as ActionsViewContent, 
-sum(video_starts) as ActionsWatchedVideo_3sec, ---- video_views???
--------(select sum(value.value) from unnest(unique_actions) as x where value.action_type like '%video_view' ) as UniqueActionsVideoView, 
+sum(video_starts) as ActionsWatchedVideo_3sec,
 null as ActionsWatchedVideo_30sec,
 sum(video_first_quartile_completions) as ActionsWatchedVideo_p25,
 sum(video_midpoint_completions) as ActionsWatchedVideo_p50,
 sum(video_third_quartile_completions) as ActionsWatchedVideo_p75,
 sum(video_completions) as ActionsWatchedVideo_p100,
------- include viral in all metrics?
 '' as url_tags,
 c.name as utm_campaign, 
 '' as  utm_source,  
@@ -623,44 +638,16 @@ null as hsa_ad,
 '' as hsa_src, 
 '' as hsa_net, 
 null as hsa_ver, 
- Case when h.HSCampaignName is not null then h.HSCampaignName
-when lower(c.name) like '%event%' and lower(c.name) like '%mqp%' then 'Other Events'
-when lower(c.name) like '%demo%' or lower(c.name) like '%pricing%' then 'Other Demo Requests' 
-when lower(c.name) like '%ebook%' or  lower(c.name) like '%download%' or lower(c.name) like '%content%'  or lower(c.name) like '%resources%' or  lower(c.name) like '%report%' or  lower(c.name) like '%masterclass%' or lower(c.name) like '%webinar recording%' or lower(c.name) like '%guide%' then 'Other Content Downloads' 
-when lower(c.name) like '%webinar%' or lower(c.name) like '%registration form%' then 'Other Webinar Registrations'
-when lower(c.name) like '%contact us%' then 'Contact Us' end as HSCampaignName,
-
-  Case when h.HSCampaignName is not null then h.HSCampaignType
-when lower(c.name) like '%event%' and lower(c.name) like '%mqp%' then 'BOFU'
-when lower(c.name) like '%demo%' or lower(c.name) like '%pricing%' then 'BOFU' 
-when lower(c.name) like '%ebook%' or  lower(c.name) like '%download%' or lower(c.name) like '%content%'  or lower(c.name) like '%resources%' or  lower(c.name) like '%report%' or  lower(c.name) like '%masterclass%' or lower(c.name) like '%webinar recording%' or lower(c.name) like '%guide%' then 'MOFU' 
-when lower(c.name) like '%webinar%' or lower(c.name) like '%registration form%' then 'MOFU'
-when lower(c.name) like '%contact us%' then 'BOFU' end as HSCampaignType,
-
-Case when coalesce(cb.HSCampaignName,cb2.HSCampaignName) is not null then 1 
-when (lower(c.name) like '%event%' and lower(c.name) like '%mqp%') or
-lower(c.name) like '%demo%' or lower(c.name) like '%pricing%' or
-lower(c.name) like '%ebook%' or  lower(c.name) like '%download%' or lower(c.name) like '%content%'  or lower(c.name) like '%resources%' or  lower(c.name) like '%report%' or  lower(c.name) like '%masterclass%' or lower(c.name) like '%webinar recording%' or lower(c.name) like '%guide%' or
-lower(c.name) like '%webinar%' or lower(c.name) like '%registration form%' or
-lower(c.name) like '%contact us%' then 1
-end as IsTrackedCampaign,
-cb.FiscalQuarterEnd as CampaignQuarterEndDate,
-coalesce(cb.ProductLine,cb2.ProductLine, 'UnMapped') as CampaignProductLine,
-Case when coalesce(cb.Stage, cb2.Stage)  is not null then coalesce(cb.Stage, cb2.Stage) 
-when lower(c.name) like '%event%' and lower(c.name) like '%mqp%' then 'BOFU'
-when lower(c.name) like '%demo%' or lower(c.name) like '%pricing%' then 'BOFU' 
-when lower(c.name) like '%ebook%' or  lower(c.name) like '%download%' or lower(c.name) like '%content%'  or lower(c.name) like '%resources%' or  lower(c.name) like '%report%' or  lower(c.name) like '%masterclass%' or lower(c.name) like '%webinar recording%' or lower(c.name) like '%guide%' then 'MOFU' 
-when lower(c.name) like '%webinar%' or lower(c.name) like '%registration form%' then 'MOFU'
-when lower(c.name) like '%contact us%' then 'BOFU' end as CampaignStage,
+h.CampaignName,
+h.HSCampaignType,
+h.IsTrackedCampaign,
+h.CampaignQuarterEndDate,
+h.CampaignProductLine,
+h.CampaignStage,
 
   FROM `crowdriff-revops.raw_linkedin_new.ad_analytics_by_creative` as i,tmp_extract_date
   join `crowdriff-revops.bi_business.calendar_standard` as d on CalendarDate = date(end_at, 'America/Toronto')
-  /*left join (SELECT id,
-            ARRAY_AGG(version.version_tag ORDER BY version.version_tag DESC LIMIT 1)[OFFSET(0)] as version,
-          FROM `crowdriff-revops.raw_linkedin_new.creatives` 
-           GROUP BY id) as ad on ad.id = i.creative_id 
-  left join `crowdriff-revops.raw_linkedin_new.creatives`  as a on a.id= ad.id and a.version.version_tag = ad.version*/
-  left join `crowdriff-revops.raw_linkedin_new.creatives`  as a on a.id = i.creative --------i.creative_id
+  left join `crowdriff-revops.raw_linkedin_new.creatives`  as a on a.id = i.creative 
   left join  `crowdriff-revops.raw_linkedin_new.video_ads` as v on a.content.reference = v.content_reference 
   left join (SELECT id,
             ARRAY_AGG(version.version_tag ORDER BY version.version_tag DESC LIMIT 1)[OFFSET(0)] as version,
@@ -668,13 +655,10 @@ when lower(c.name) like '%contact us%' then 'BOFU' end as CampaignStage,
            GROUP BY id) as ca on ca.id = a.campaign_id 
   left join `crowdriff-revops.raw_linkedin_new.campaigns`  as c on c.id= ca.id and c.version.version_tag = ca.version
   left join `crowdriff-revops.raw_linkedin_new.campaign_groups`  as cg on c.campaign_group_id = cg.id
-  left join
-(select distinct * from `crowdriff-revops`.`bi_business`.`HSCampaignMapping`) as h  on c.name = h.AdCampaignName 
-left join (select distinct * from `crowdriff-revops.bi_business.DG_Qtr_CampaignBudget` where FiscalQuarterEnd is not null) as cb on cb.HSCampaignName = h.AdCampaignName   and cb.FiscalQuarterEnd = d.FiscalQuarterEnd 
-  left join (select distinct * from `crowdriff-revops.bi_business.DG_Qtr_CampaignBudget` where FiscalQuarterEnd is null and coalesce(Budget_CAD,0) = 0) as cb2 on cb2.HSCampaignName = h.AdCampaignName and cb.FiscalQuarterEnd is null
+  left join Campaign_Breakdown h on c.name = h.name
  where  calendarmonthsfromcurrent >=-24  
  Group by
- CalendarWeekStart, 
+CalendarWeekStart, 
 CalendarWeekEnd,  
 CalendarMonthStart,
 CalendarMonthEnd,		
@@ -687,13 +671,9 @@ CalendarWeeksFromCurrent,
 CalendarMonthsFromCurrent,
 FiscalQuartersfromCurrent, 
 LastExtract,
-------CalendarDate, 
-------cg.name as CampaignGroup, 
---------campaign_group_id as CampaignGroupId, 
 c.name, 
 coalesce(h.HSCampaignName,c.name) ,
 campaign_id, 
-
 c.status, 
 coalesce(v.name,a.content.reference), 
 creative_id, 
@@ -702,35 +682,12 @@ cost_type,
 creative_selection,
 v.type,
 c.daily_budget.amount,
- Case when h.HSCampaignName is not null then h.HSCampaignName
-when lower(c.name) like '%event%' and lower(c.name) like '%mqp%' then 'Other Events'
-when lower(c.name) like '%demo%' or lower(c.name) like '%pricing%' then 'Other Demo Requests' 
-when lower(c.name) like '%ebook%' or  lower(c.name) like '%download%' or lower(c.name) like '%content%'  or lower(c.name) like '%resources%' or  lower(c.name) like '%report%' or  lower(c.name) like '%masterclass%' or lower(c.name) like '%webinar recording%' or lower(c.name) like '%guide%' then 'Other Content Downloads' 
-when lower(c.name) like '%webinar%' or lower(c.name) like '%registration form%' then 'Other Webinar Registrations'
-when lower(c.name) like '%contact us%' then 'Contact Us' end ,
-
-  Case when h.HSCampaignName is not null then h.HSCampaignType
-when lower(c.name) like '%event%' and lower(c.name) like '%mqp%' then 'BOFU'
-when lower(c.name) like '%demo%' or lower(c.name) like '%pricing%' then 'BOFU' 
-when lower(c.name) like '%ebook%' or  lower(c.name) like '%download%' or lower(c.name) like '%content%'  or lower(c.name) like '%resources%' or  lower(c.name) like '%report%' or  lower(c.name) like '%masterclass%' or lower(c.name) like '%webinar recording%' or lower(c.name) like '%guide%' then 'MOFU' 
-when lower(c.name) like '%webinar%' or lower(c.name) like '%registration form%' then 'MOFU'
-when lower(c.name) like '%contact us%' then 'BOFU' end ,
-
-Case when coalesce(cb.HSCampaignName,cb2.HSCampaignName) is not null then 1 
-when (lower(c.name) like '%event%' and lower(c.name) like '%mqp%') or
-lower(c.name) like '%demo%' or lower(c.name) like '%pricing%' or
-lower(c.name) like '%ebook%' or  lower(c.name) like '%download%' or lower(c.name) like '%content%'  or lower(c.name) like '%resources%' or  lower(c.name) like '%report%' or  lower(c.name) like '%masterclass%' or lower(c.name) like '%webinar recording%' or lower(c.name) like '%guide%' or
-lower(c.name) like '%webinar%' or lower(c.name) like '%registration form%' or
-lower(c.name) like '%contact us%' then 1
-end ,
-cb.FiscalQuarterEnd,
-coalesce(cb.ProductLine,cb2.ProductLine, 'UnMapped') ,
-Case when coalesce(cb.Stage, cb2.Stage)  is not null then coalesce(cb.Stage, cb2.Stage) 
-when lower(c.name) like '%event%' and lower(c.name) like '%mqp%' then 'BOFU'
-when lower(c.name) like '%demo%' or lower(c.name) like '%pricing%' then 'BOFU' 
-when lower(c.name) like '%ebook%' or  lower(c.name) like '%download%' or lower(c.name) like '%content%'  or lower(c.name) like '%resources%' or  lower(c.name) like '%report%' or  lower(c.name) like '%masterclass%' or lower(c.name) like '%webinar recording%' or lower(c.name) like '%guide%' then 'MOFU' 
-when lower(c.name) like '%webinar%' or lower(c.name) like '%registration form%' then 'MOFU'
-when lower(c.name) like '%contact us%' then 'BOFU' end 
+h.CampaignName,
+h.HSCampaignType,
+h.IsTrackedCampaign,
+h.CampaignQuarterEndDate,
+h.CampaignProductLine,
+h.CampaignStage
  ; 
 
 ----  google ads --- total performance
