@@ -37,7 +37,6 @@ Join `crowdriff-revops`.`bi_business`.`calendar_standard` as c on b.Fiscalyyyyq 
 
 -- FACEBOOK
 DELETE FROM `crowdriff-revops`.`bi_business`.`ad_analytics_weekly` WHERE TRUE;
-
 INSERT  `crowdriff-revops`.`bi_business`.`ad_analytics_weekly`
 
 With tmp_extract_date as
