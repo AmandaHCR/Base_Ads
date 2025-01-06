@@ -1408,14 +1408,11 @@ h.CampaignQuarterEndDate,
 h.CampaignProductLine,
 h.CampaignStage;
 
--------------------------------------------
-------------------------------------ga4 session summary
+-- GA 4 SESSION SUMMARY
 DELETE FROM `crowdriff-revops`.`bi_business`.`ga4_analytics` WHERE TRUE;
-
 INSERT  `crowdriff-revops`.`bi_business`.`ga4_analytics`
 
 SELECT
-
 user_pseudo_id,
 (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS session_id,
 (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_number') AS session_events_number,
@@ -1423,7 +1420,6 @@ CONCAT(user_pseudo_id,"_",(SELECT value.int_value FROM UNNEST(event_params) WHER
 MIN( DATE(TIMESTAMP_MICROS(event_timestamp ),'America/Toronto'))as session_start_date,
 Min(DATETIME(TIMESTAMP_MICROS(event_timestamp), 'America/Toronto')) AS session_start_ts,
 Max(DATETIME(TIMESTAMP_MICROS(event_timestamp), 'America/Toronto')) as  session_end_ts,
-    
 Min(DATETIME(TIMESTAMP_MICROS(user_first_touch_timestamp), 'America/Toronto')) as user_first_touch_ts,
 Min(case when event_name = 'generate_lead' then DATETIME(TIMESTAMP_MICROS(event_timestamp), 'America/Toronto')end) AS conversion_ts,
 Max((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_referrer')) AS referrer,
@@ -1431,7 +1427,6 @@ Max((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'link_domai
 Max((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location')) AS landing_page_path,
 Max((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_title')) AS landing_page_title,
 Max((SELECT value.string_value FROM UNNEST(event_params) WHERE event_name = 'generate_lead' AND key = 'campaign')) AS lead_campaign,
-------        Max((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'campaign_id')) AS campaign_id,
 Max((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'term')) AS term,
 Max((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'gclid')) AS gclid,
 Max((SELECT value.string_value FROM UNNEST(event_params) WHERE event_name = 'generate_lead' AND key = 'form_id')) AS form_id,
@@ -1441,7 +1436,6 @@ Max((SELECT Case when value.string_value = 'true' then 1 else 0 end FROM UNNEST(
 Max(COALESCE((SELECT value.int_value FROM unnest(event_params) WHERE key = 'engaged_session_event'),
     (CASE WHEN (SELECT value.string_value FROM unnest(event_params) WHERE key = "session_engaged") = "1" THEN 1 END)
     )) as engaged,
------value.int_value FROM UNNEST(event_params) WHERE key = 'session_engaged')) AS engaged,
 sum((select value.int_value from unnest(event_params) where key = 'engagement_time_msec'))/1000 as engaged_time_seconds,
 Max((SELECT value.string_value FROM UNNEST(event_params) WHERE event_name = 'generate_lead' AND  key = 'source')) AS lead_source,
 Max((SELECT value.string_value FROM UNNEST(event_params) WHERE event_name = 'generate_lead' AND  key = 'medium')) AS lead_medium,
@@ -1452,7 +1446,6 @@ Max((SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'search_ter
 Max(traffic_source.name) as first_source_name,
 Max(traffic_source.medium) as first_source_medium,
 Max(traffic_source.source) as first_source_source,
-
 Max(event_dimensions.hostname) as event_dimensions_hostname,
 ---- session start traffic
 STRING_AGG(collected_traffic_source.manual_campaign_id ORDER BY event_timestamp asc limit 1) as start_campaign_id,
@@ -1465,7 +1458,6 @@ STRING_AGG(collected_traffic_source.manual_content ORDER BY event_timestamp asc 
 STRING_AGG(collected_traffic_source.gclid ORDER BY event_timestamp asc limit 1) as start_gclid,
 STRING_AGG(collected_traffic_source.dclid ORDER BY event_timestamp asc limit 1) as start_dclid,
 STRING_AGG(collected_traffic_source.srsltid ORDER BY event_timestamp asc limit 1) as start_srsltid,
-
 Max(geo.continent) as geo_continent,
 Max(geo.country) as geo_country,
 Max(geo.region) as geo_region,
@@ -1478,14 +1470,11 @@ WHEN device.category = "mobile" AND app_info.id IS NULL THEN "mobile-web"
 WHEN device.category = "tablet" AND app_info.id IS NOT NULL THEN "tablet-app"
 WHEN device.category = "mobile" AND app_info.id IS NOT NULL THEN "mobile-app"
 END) as device_category,
-
 Max(device.operating_system) as device_operating_system,
 Max(device.operating_system_version) as device_operating_system_version,
-
 Max(device.language) as device_language,
 Max(device.is_limited_ad_tracking) as device_is_limited_ad_tracking,
 Max(device.time_zone_offset_seconds) as device_time_zone_offset_seconds,
-
 Max(device.web_info.browser) as device_web_info_browser,
 Max(device.web_info.browser_version) as device_web_info_browser_version,
 Max(device.web_info.hostname) as device_web_info_hostname,
@@ -1511,34 +1500,25 @@ count(case when (select value.int_value from unnest(event_params) where event_na
 Count(Case when event_name = 'click' then event_name end) as click_count,
 ---- a session that lasts longer than 10 seconds, has a conversion event, or has at least two pageviews or screenviews. --- gives engagement rate
 count((SELECT value.int_value FROM unnest(event_params) WHERE key = 'engaged_session_event')) as engaged_session_count,
-
-    
 FROM    `crowdriff-revops.analytics_337939722.events_*` s 
   WHERE 
     user_pseudo_id is not null and _TABLE_SUFFIX BETWEEN replace(cast(DATE_SUB(CURRENT_DATE, INTERVAL 24 MONTH) as string),"-","") AND replace(cast(CURRENT_DATE as string),"-","")
-    ------and user_pseudo_id = '1000731600.1702455667'------and 
-     
     group by 1,2,(SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id'),3,4
     order by 1,2,3; 
 
---------------------------------------------------
------Add channel grouping
+-- CHANNEL GROUPING
 
 UPDATE `crowdriff-revops`.`bi_business`.`ga4_analytics` as U
 SET     u.`start_channel_grouping`=  
 
 --------------based on https://github.com/Velir/dbt-ga4
 
-
-
-  -- Direct: Source exactly matches "(direct)" AND Medium is one of ("(not set)", "(none)")
  case when (
       lower(o.start_source) is null
         and lower(o.start_Medium) is null
     )
     or 
       lower(o.start_source) like 'direct%'
-      -----and (lower(o.start_Medium) = '(none)' 
       or lower(o.start_Medium) = '(not set)'
       or lower(o.start_medium) like '%direct%'
     
@@ -1547,95 +1527,35 @@ SET     u.`start_channel_grouping`=
       when lower(o.start_source) like 'website%'  or lower(o.start_Medium) like 'website%'   or lower(o.start_Medium) like 'platform' or lower(o.start_source) like '%crowdriff%'  or lower(o.start_source) like '%localhood%' or lower(o.start_source) like '%uberflip%'  or lower(o.start_source) like '%webinar%'  or  lower(o.start_source) like '%drift%' or  lower(o.start_source) like 'ebook%' or lower(o.start_source) like 'events %' or lower(o.start_Medium) like 'notification%'
  then 'Direct'
 
- /* -- Cross-network: Campaign Name contains "cross-network"
-  when REGEXP_CONTAINS(start_campaign_name, r"cross-network")
-    then 'Cross-network'*/
-
-  -- Paid Shopping:
-  --   (Source matches a list of shopping sites
-  --   OR
-  --   Campaign Name matches regex ^(.*(([^a-df-z]|^)shop|shopping).*)$)
-  --   AND
-  --   Medium matches regex ^(.*cp.*|ppc|retargeting|paid.*)$
   when (
       source_category = 'SOURCE_CATEGORY_SHOPPING'
       or REGEXP_CONTAINS(o.start_campaign_name, r"^(.*(([^a-df-z]|^)shop|shopping).*)$")
     )
     and REGEXP_CONTAINS(lower(o.start_Medium),r"^(.*cp.*|ppc|retargeting|paid.*)$")
     then 'Paid Shopping'
-
-  -- Paid Search:
-  --   Source matches a list of search sites
-  --   AND
-  --   Medium matches regex ^(.*cp.*|ppc|retargeting|paid.*)$
   when source_category = 'SOURCE_CATEGORY_SEARCH'
     and REGEXP_CONTAINS(lower(o.start_Medium), r"^(.*cp.*|ppc|retargeting|paid.*)$")
     then 'Paid Search'
-
-  -- Paid Social:
-  --   Source matches a regex list of social sites
-  --   AND
-  --   Medium matches regex ^(.*cp.*|ppc|retargeting|paid.*)$
   when source_category = 'SOURCE_CATEGORY_SOCIAL'
     and REGEXP_CONTAINS(lower(o.start_Medium), r"^(.*cp.*|ppc|retargeting|paid.*|social_paid)$")
     then 'Paid Social'
-
-  -- Paid Video:
-  --   Source matches a list of video sites
-  --   AND
-  --   Medium matches regex ^(.*cp.*|ppc|retargeting|paid.*)$
   when source_category = 'SOURCE_CATEGORY_VIDEO'
     and REGEXP_CONTAINS(lower(o.start_Medium),r"^(.*cp.*|ppc|retargeting|paid.*)$")
     then 'Paid Video'
-
-  -- Display:
-  --   Medium is one of ("display", "banner", "expandable", "interstitial", "cpm")
   when lower(o.start_Medium) in ('display', 'banner', 'expandable', 'interstitial', 'cpm')
-  or lower(o.start_source) like 'display%'
-
-    then 'Display'
-
-  -- Paid Other:
-  --   Medium matches regex ^(.*cp.*|ppc|retargeting|paid.*)$
+  or lower(o.start_source) like 'display%'then 'Display'
   when REGEXP_CONTAINS(lower(o.start_Medium), r"^(.*cp.*|ppc|retargeting|paid.*)$")
     then 'Paid Other'
-
-  -- Organic Shopping:
-  --   Source matches a list of shopping sites
-  --   OR
-  --   Campaign name matches regex ^(.*(([^a-df-z]|^)shop|shopping).*)$
   when source_category = 'SOURCE_CATEGORY_SHOPPING'
     or REGEXP_CONTAINS(o.start_campaign_name, r"^(.*(([^a-df-z]|^)shop|shopping).*)$")
     then 'Organic Shopping'
-
-  -- Organic Social:
-  --   Source matches a regex list of social sites
-  --   OR
-  --   Medium is one of ("social", "social-network", "social-media", "sm", "social network", "social media")
   when source_category = 'SOURCE_CATEGORY_SOCIAL'
-    or ------lower(o.start_Medium) in ("social","social-network","social-media","sm","social network","social media")
-    regexp_contains(lower(o.start_Medium), r'^(social|social_advertising|social-advertising|social_network|social-network|social_media|social-media|sm|social-unpaid|social_unpaid)$')
-
-    then 'Organic Social'
-
-  -- Organic Video:
-  --   Source matches a list of video sites
-  --   OR
-  --   Medium matches regex ^(.*video.*)$
+    or regexp_contains(lower(o.start_Medium), r'^(social|social_advertising|social-advertising|social_network|social-network|social_media|social-media|sm|social-unpaid|social_unpaid)$')then 'Organic Social'
   when source_category = 'SOURCE_CATEGORY_VIDEO'
     or REGEXP_CONTAINS(lower(o.start_Medium), r"^(.*video.*)$")
     then 'Organic Video'
-
-  -- Organic Search:
-  --   Source matches a list of search sites
-  --   OR
-  --   Medium exactly matches organic
   when source_category = 'SOURCE_CATEGORY_SEARCH' or lower(o.start_Medium) = 'organic'
     then 'Organic Search'
-
-  -- Referral:
-  --   Medium is one of ("referral", "app", or "link") -----marketplace
-
   when lower(o.start_Medium) in ("referral", "app", "link", 'marketplace', 'newsletter','sponsored content', 'sponsored_content')
   or lower(o.start_Medium) like '%affiliate%' 
   or lower(o.start_Source) like '%skift%'
@@ -1652,12 +1572,6 @@ SET     u.`start_channel_grouping`=
   or  lower(o.start_Medium) like '%event%'  
   or  lower(o.start_source) like '%event%' 
     then 'Referral'
-
-
-  -- Email:
-  --   Source = email|e-mail|e_mail|e mail
-  --   OR
-  --   Medium = email|e-mail|e_mail|e mail
   when REGEXP_CONTAINS(lower(o.start_source), r"email|e-mail|e_mail|e mail")
     or REGEXP_CONTAINS(lower(o.start_Medium), r"email|e-mail|e_mail|e mail")
      or regexp_contains(lower(o.start_source), r'^(email|mail|e-mail|e_mail|e mail|mail\.google\.com|sigstr|gnature|the riff|automation|banner)$')
@@ -1666,232 +1580,25 @@ SET     u.`start_channel_grouping`=
             or lower(o.start_source) like '%banner%' or lower(o.start_source) like 'hs_email%' or lower(o.start_source) like 'hs-email%' or lower(o.start_source) like '%blog%' or  lower(o.start_Medium) like 'sigstr%' or  lower(o.start_Medium) like '%gnature%'or lower(o.start_source) like 'sigstr%' or  lower(o.start_Source) like '%gnature%' or lower(o.start_source) like '%the riff% ' or lower(o.start_source) like '%automation%' 
 
     then 'Email'
-
-  -- Affiliates:
-  --   Medium = affiliate
- /* when lower(o.start_Medium) = 'affiliate'
-    then 'Affiliate'*/
-
-  -- Audio:
-  --   Medium exactly matches audio
-  /*when lower(o.start_Medium) = 'audio'
-    then 'Audio'*/
-
-  -- SMS:
-  --   Source exactly matches sms
-  --   OR
-  --   Medium exactly matches sms
- /* when lower(o.start_source) = 'sms'
-    or lower(o.start_Medium) = 'sms'
-    then 'SMS'*/
-
-  -- Mobile Push Notifications:
-  --   Medium ends with "push"
-  --   OR
-  --   Medium contains "mobile" or "notification"
-  --   OR
-  --   Source exactly matches "firebase"
- /* when REGEXP_CONTAINS(lower(o.start_Medium), r"push$")
-    or REGEXP_CONTAINS(lower(o.start_Medium), r"mobile|notification")
-    or lower(o.start_source) = 'firebase'
-    then 'Mobile Push Notifications'*/
-
-
-
-  -- Unassigned is the value Analytics uses when there are no other channel rules that match the event data.
   else 'Other'
 end 
 FROM `crowdriff-revops`.`bi_business`.`ga4_analytics` as O 
 left join  `crowdriff-revops.bi_business.ga_source_categories` as s on lower(o.start_source) = lower(s.source) 
 WHERE U.`user_session_id` = O.`user_session_id` and O.user_session_id is not null;
 
-/*Case
- when lower(o.start_Medium) like '%direct%' or lower(o.start_source) like '%direct%'or lower(o.start_source) like '%website%'  or lower(o.start_Medium) like '%website%'   or lower(o.start_Medium) like 'platform' or lower(o.start_source) like '%crowdriff%'  or lower(o.start_source) like '%localhood%' or lower(o.start_source) like '%uberflip%'  or lower(o.start_source) like '%webinar%' or lower(o.start_source) like '%website%'  or lower(o.start_Medium) like '%website%' or  lower(o.start_source) like '%drift%' or  lower(o.start_source) like 'ebook%' or lower(o.start_source) like 'event%' or lower(o.start_Medium) like 'notification%'
- then 'Direct'
-
-
-when lower(o.start_source) is null and lower(o.start_Medium) is null then 'Direct'
- 
-when lower(o.start_source) is null and
-            regexp_contains(lower(o.start_Medium), r'^(\(not set\)|\(none\))$')
-            then 'Direct'
-
-
-
-
-when (regexp_contains(lower(o.start_source), r'^(twitter|facebook|fb|instagram|ig|linkedin|pinterest)$')
-            and regexp_contains(lower(o.start_Medium), r'^(.*cp.*|ppc|paid.*|social_paid)$'))
-            or lower(o.start_source) = 'paidsocial'
-            then 'Paid Social'
-
-
-when lower(o.start_Medium) in ('paidsearch' ) then 'Search Paid'
-when -----regexp_contains(lower(o.start_source), r'^(google|bing|baidu)$') and
-            regexp_contains(lower(o.start_Medium), r'^(.*cp.*|ppc|paid.*)$')
-            then 'Paid Search'
-
-
-when lower(o.start_Medium) in ('paidvideo' ) then 'Video Paid'
-        when regexp_contains(lower(o.start_source), r'^(youtube|tiktok|vimeo)$')
-            and regexp_contains(lower(o.start_Medium), r'^(.*cp.*|ppc|paid.*)$')
-            then 'Paid Video'
-
-
-when regexp_contains(lower(o.start_Medium), r'^(display|banner|expandable|interstitial|cpm)$') or lower(o.start_source) like 'display%'
-            then 'Display'
-
-
-------when lower(o.start_source) in ('google', 'bing', 'baidu') and lower(o.start_Medium) in ('ppc',  'cpc') then "Paid Search" --- search_paid
- when regexp_contains(lower(o.start_Medium), r'^(.*cp.*|ppc|paid.*)$') or lower(o.start_source) in ('ppc', 'cpc') or lower(o.start_medium) in ('ppc', 'cpc')
-            then 'Paid Search'
-
-
-----when lower(o.start_source) in ('ppc',  'cpc') or lower(o.start_Medium) in ('ppc',  'cpc') or lower(o.start_Medium) like 'paid%' or lower(o.start_source) like 'paid%' then "Other Paid" --- other_paid
-
-
-when regexp_contains(lower(o.start_Medium), r'^(.*shop.*)$') then 'Organic Shopping'
-       
-when regexp_contains(lower(o.start_Medium), r'^.*(twitter|t\.co|facebook|instagram|linkedin|lnkd\.in|pinterest).*') or
-        regexp_contains(lower(o.start_Source), r'^.*(twitter|t\.co|facebook|instagram|linkedin|lnkd\.in|pinterest).*') or
-        regexp_contains(lower(o.start_Medium), r'^.*(twitter|t\.co|facebook|instagram|linkedin|lnkd\.in|pinterest).*')
-            or regexp_contains(lower(o.start_Medium), r'^(social|social_advertising|social-advertising|social_network|social-network|social_media|social-media|sm|social-unpaid|social_unpaid)$')
-            then 'Organic Social'
-           
-       
-when lower(o.start_Medium) in  ('youtube', 'tiktok', 'vimeo') or lower(o.start_source) in ('youtube', 'tiktok', 'vimeo')
-or lower(o.start_Medium) = 'video'
-            then 'Organic Video' --- include tv
-
-
-when regexp_contains(lower(o.start_source), r'^(google|bing|yahoo|baidu|duckduckgo|yandex|ask|adwords|googleads)$')  or lower(o.start_Medium) = 'organic'
-            then 'Organic Search'
-
-
-when regexp_contains(lower(o.start_source), r'^(email|mail|e-mail|e_mail|e mail|mail\.google\.com|sigstr|gnature|the riff|automation|banner)$')
-            or regexp_contains(lower(o.start_Medium), r'^(email|mail|e-mail|e_mail|e mail|sigstr|gnature|the riff|automation|banner)$')
-            or lower(o.start_source) like '%mail'
-            then 'Email'
-
-
-when   lower(o.start_source) like '%banner%' or lower(o.start_source) like 'hs_email%' or lower(o.start_source) like 'hs-email%' or lower(o.start_source) like '%blog%' or  lower(o.start_Medium) like 'sigstr%' or  lower(o.start_Medium) like '%gnature%'or lower(o.start_source) like 'sigstr%' or  lower(o.start_Source) like '%gnature%' or lower(o.start_source) like '%the riff% ' or lower(o.start_source) like '%automation% 'then'Email'
-
-
-when lower(o.start_Medium) like '%referral%' or lower(o.start_source) like '%uberflip%' or lower(o.start_source) like '%webinar%'  or lower(o.start_source) like '%ebook%' or lower(o.start_Medium) like '%newsletter%' then 'Referral'
-
-
-when lower(o.start_Medium) like '%affiliate%' or lower(o.start_Medium) like '%sponsor%' or  lower(o.start_source) like 'sponsor%'or lower(o.start_Medium) like 'article%' or lower(o.start_source) like 'article%' or lower(o.start_Medium) like 'skift%' or lower(o.start_source) like 'skift%' or  lower(o.start_source) like '%simpleview%' or  lower(o.start_Medium) like '%simpleview%' or  lower(o.start_source) like '%partner%' or  lower(o.start_Medium) like '%event%'  or  lower(o.start_source) like '%event%' then 'Referral'
- 
- when  lower(o.start_medium) like '%not set%' then 'Direct'    
-       /* when o.start_medium = 'audio'
-            then 'audio'
-        when o.start_medium = 'sms'
-            then 'sms'
-        when ends_with(o.start_medium, 'push')
-            or regexp_contains(o.start_medium, r'.*(mobile|notification).*')
-            then 'mobile_push'*/
-/*
-else 'Other'
-end
-*/
- /*  case
-        when (o.start_source = 'direct' or o.start_source is null) 
-            and (regexp_contains(o.start_medium, r'^(\(not set\)|\(none\))$') or o.start_medium is null) 
-            then 'direct'
-        when regexp_contains(o.start_campaign_name, r'^(.*shop.*)$') 
-            and regexp_contains(o.start_medium, r'^(.*cp.*|ppc|paid.*)$') 
-            then 'shopping_paid'
-        when regexp_contains(o.start_source, r'^(google|bing)$') 
-            and regexp_contains(o.start_medium, r'^(.*cp.*|ppc|paid.*)$') 
-            then 'search_paid'
-        when regexp_contains(o.start_source, r'^(twitter|facebook|fb|instagram|ig|linkedin|pinterest)$')
-            and regexp_contains(o.start_medium, r'^(.*cp.*|ppc|paid.*|social_paid)$') 
-            then 'social_paid'
-        when regexp_contains(o.start_source, r'^(youtube)$')
-            and regexp_contains(o.start_medium, r'^(.*cp.*|ppc|paid.*)$') 
-            then 'video_paid'
-        when regexp_contains(o.start_medium, r'^(display|banner|expandable|interstitial|cpm)$') 
-            then 'display'
-        when regexp_contains(o.start_medium, r'^(.*cp.*|ppc|paid.*)$') 
-            then 'other_paid'
-        when regexp_contains(o.start_medium, r'^(.*shop.*)$') 
-            then 'shopping_organic'
-        when regexp_contains(o.start_source, r'^.*(twitter|t\.co|facebook|instagram|linkedin|lnkd\.in|pinterest).*') 
-            or regexp_contains(o.start_medium, r'^(social|social_advertising|social-advertising|social_network|social-network|social_media|social-media|sm|social-unpaid|social_unpaid)$') 
-            then 'social_organic'
-        when regexp_contains(o.start_medium, r'^(.*video.*)$') 
-            then 'video_organic'
-        when regexp_contains(o.start_source, r'^(google|bing|yahoo|baidu|duckduckgo|yandex|ask)$') 
-            or o.start_medium = 'organic'
-            then 'search_organic'
-        when regexp_contains(o.start_source, r'^(email|mail|e-mail|e_mail|e mail|mail\.google\.com)$') 
-            or regexp_contains(o.start_medium, r'^(email|mail|e-mail|e_mail|e mail)$') 
-            then 'email'
-        when regexp_contains(o.start_medium, r'^(affiliate|affiliates)$') 
-            then 'affiliate'
-        when o.start_medium = 'referral'
-            then 'referral'
-        when o.start_medium = 'audio' 
-            then 'audio'
-        when o.start_medium = 'sms'
-            then 'sms'
-        when ends_with(o.start_medium, 'push')
-            or regexp_contains(o.start_medium, r'.*(mobile|notification).*') 
-            then 'mobile_push'
-        else '(other)'
-    end*/
-   
-
-
---------------------------------------------------------------------------------------------------------------------------------------
----------------------create Google Analytics data
+-- GOOGLE ANALYTICS
 -----GA Universal up to 2023-06-30
-  DELETE FROM `crowdriff-revops`.`bi_business`.`weekly_ga_traffic` WHERE TRUE;
 
+DELETE FROM `crowdriff-revops`.`bi_business`.`weekly_ga_traffic` WHERE TRUE;
 INSERT  `crowdriff-revops`.`bi_business`.`weekly_ga_traffic` 
 
 (With tmp_extract_date as
 (Select max(date(ga_date)) as Latest_GA_Day
 FROM `crowdriff-revops.raw_googanalytics.Channel_Geo` ),
 
-tmp_data as (
-SELECT 
-CalendarWeekStart, 
-CalendarWeekEnd,  
-CalendarMonthStart,
-CalendarMonthEnd,		
-d.FiscalQuarterStart,			
-d.FiscalQuarterEnd,	
-Calendaryyyymmm,	
-Replace(d.Fiscalyyyyq,'_',' ') as Fiscalyyyyq,
-Fiscalyyyy,
-CalendarWeeksFromCurrent,
-CalendarMonthsFromCurrent,
-FiscalQuartersfromCurrent, 
-------date(ga_date) as date, 
-ga_channelgrouping as GA_ChannelGrouping,
-/*case when ga_country in ('Canada', 'United States') then 'NORTH AMERICA'
-  when ga_country in ('Bahrain', 'Egypt', 'Iran', 'Iraq', 'Jordan', 'Israel', 'Kuwait','Lebanon','Oman', 
-'Palestine', 'Qatar','Saudi Arabia', 'Syria','United Arab Emirates', 'Yemen') then 'ME & AFRICA'
-  when ga_country in ('Cyprus', 'Turkey') then 'EUROPE'
-  when ga_continent = 'Africa' then 'ME & AFRICA'
-  when ga_continent = '(not set)' then 'Unknown'
-  else Upper(ga_continent) end as ReportRegion,*/
-Coalesce(ReportingRegion,'Other') as ReportRegion,
-Case when Coalesce(Country,ga_country) in ('United States', 'Canada', 'United Kingdom') then Coalesce(Country,ga_country) else 'Other' end as Country, ---------ReportingRegion in ('NORTH AMERICA','EUROPE','OCEANIA') then Coalesce(Country,ga_country) else 'Other' end as Country, 
-ga_campaign as GA_Campaign, 
-Trim(Case  when lower(GA_ChannelGrouping) = 'referral' then
-    Case when REGEXP_CONTAINS(lower(GA_Sourcemedium), '(linkedin|facebook|instagram|google|youtube|crowdriff|localhood|uberflip)')   then GA_Sourcemedium 
-    else 'xxxxx / referral' end else  GA_Sourcemedium end) as GA_SourceMedium,
-Trim(Case when lower(GA_ChannelGrouping) = 'referral' then 
-    Case when REGEXP_CONTAINS(lower(GA_Sourcemedium), '(linkedin|facebook|instagram|google|youtube|crowdriff|localhood|uberflip)')   then SPLIT(ga_sourcemedium, '/')[OFFSET(0)] 
-    else 'xxxxx' end else SPLIT(ga_sourcemedium, '/')[OFFSET(0)] end) as GA_Source,
-Trim(SPLIT(ga_sourcemedium, '/')[OFFSET(1)]) as GA_Medium,
-sum(ga_sessions) as Sessions,
-sum(ga_uniquepageviews) as PageViews,
-sum(cast(ga_sessionduration as float64)) as Duration, 
-sum(ga_users) as Users, 
-sum(ga_newusers) as NewUsers,
-Latest_GA_Day,
+Campaign_Breakdown as
+(Select 
+g.ga_campaign,
  Case when h.HSCampaignName is not null then h.HSCampaignName
 when lower(ga_campaign) like '%event%' and lower(ga_campaign) like '%mqp%' then 'Other Events'
 when lower(ga_campaign) like '%demo%' or lower(ga_campaign) like '%pricing%' then 'Other Demo Requests' 
@@ -1914,14 +1621,59 @@ lower(ga_campaign) like '%webinar%' or lower(ga_campaign) like '%registration fo
 lower(ga_campaign) like '%contact us%' then 1
 end as IsTrackedCampaign,
 
-b.FiscalQuarterEnd as CampaignQuarterEndDate,
-coalesce(b.ProductLine,b2.ProductLine, 'UnMatched') as CampaignProductLine,
-Case when coalesce(b.stage,b2.stage) is not null then coalesce(b.stage,b2.stage)
+cb.FiscalQuarterEnd as CampaignQuarterEndDate,
+coalesce(cb.ProductLine,cb2.ProductLine, 'UnMatched') as CampaignProductLine,
+Case when coalesce(cb.stage,b2.stage) is not null then coalesce(cb.stage,b2.stage)
 when lower(ga_campaign) like '%event%' and lower(ga_campaign) like '%mqp%' then 'BOFU'
 when lower(ga_campaign) like '%demo%' or lower(ga_campaign) like '%pricing%' then 'BOFU' 
 when lower(ga_campaign) like '%ebook%' or  lower(ga_campaign) like '%download%' or lower(ga_campaign) like '%content%'  or lower(ga_campaign) like '%resources%' or  lower(ga_campaign) like '%report%' or  lower(ga_campaign) like '%masterclass%' or lower(ga_campaign) like '%webinar recording%' or lower(ga_campaign) like '%guide%' then 'MOFU' 
 when lower(ga_campaign) like '%webinar%' or lower(ga_campaign) like '%registration form%' then 'MOFU'
 when lower(ga_campaign) like '%contact us%' then 'BOFU' end as CampaignStage,
+FROM `crowdriff-revops.raw_googanalytics.Channel_Geo` as g
+left join
+(select distinct * from `crowdriff-revops`.`bi_business`.`HSCampaignMapping`) as h  on ga.ga_campaign = h.AdCampaignName 
+left join (select distinct * from `crowdriff-revops.bi_business.DG_Qtr_CampaignBudget` where FiscalQuarterEnd is not null) as cb on cb.HSCampaignName = h.AdCampaignName   and cb.FiscalQuarterEnd = d.FiscalQuarterEnd 
+  left join (select distinct * from `crowdriff-revops.bi_business.DG_Qtr_CampaignBudget` where FiscalQuarterEnd is null and coalesce(Budget_CAD,0) = 0) as cb2 on cb2.HSCampaignName = h.AdCampaignName and cb.FiscalQuarterEnd is null
+),
+
+
+tmp_data as (
+SELECT 
+CalendarWeekStart, 
+CalendarWeekEnd,  
+CalendarMonthStart,
+CalendarMonthEnd,		
+d.FiscalQuarterStart,			
+d.FiscalQuarterEnd,	
+Calendaryyyymmm,	
+Replace(d.Fiscalyyyyq,'_',' ') as Fiscalyyyyq,
+Fiscalyyyy,
+CalendarWeeksFromCurrent,
+CalendarMonthsFromCurrent,
+FiscalQuartersfromCurrent,  
+ga_channelgrouping as GA_ChannelGrouping,
+Coalesce(ReportingRegion,'Other') as ReportRegion,
+Case when Coalesce(Country,ga_country) in ('United States', 'Canada', 'United Kingdom') then Coalesce(Country,ga_country) else 'Other' end as Country, 
+ga_campaign as GA_Campaign, 
+Trim(Case  when lower(GA_ChannelGrouping) = 'referral' then
+    Case when REGEXP_CONTAINS(lower(GA_Sourcemedium), '(linkedin|facebook|instagram|google|youtube|crowdriff|localhood|uberflip)')   then GA_Sourcemedium 
+    else 'xxxxx / referral' end else  GA_Sourcemedium end) as GA_SourceMedium,
+Trim(Case when lower(GA_ChannelGrouping) = 'referral' then 
+    Case when REGEXP_CONTAINS(lower(GA_Sourcemedium), '(linkedin|facebook|instagram|google|youtube|crowdriff|localhood|uberflip)')   then SPLIT(ga_sourcemedium, '/')[OFFSET(0)] 
+    else 'xxxxx' end else SPLIT(ga_sourcemedium, '/')[OFFSET(0)] end) as GA_Source,
+Trim(SPLIT(ga_sourcemedium, '/')[OFFSET(1)]) as GA_Medium,
+sum(ga_sessions) as Sessions,
+sum(ga_uniquepageviews) as PageViews,
+sum(cast(ga_sessionduration as float64)) as Duration, 
+sum(ga_users) as Users, 
+sum(ga_newusers) as NewUsers,
+Latest_GA_Day,
+h.CampaignName,
+h.CampaignType,
+h.IsTrackedCampaign,
+h.CampaignQuarterEndDate,
+h.CampaignProductLine,
+h.CampaignStage,
 null as LandingPageViews,
 null as Clicks,
 null as EngagedSessions,
@@ -1930,27 +1682,12 @@ null as GeneratedLeads,
 FROM `crowdriff-revops.raw_googanalytics.Channel_Geo` ,  tmp_extract_date
 join `crowdriff-revops.bi_business.calendar_standard` as d on CalendarDate = date(ga_date)
 left join `crowdriff-revops.bi_business.CountryRegionCodes` as m on replace(replace(replace(ga_country,'&','and'),'St.','Saint'),".","") = Country 
----------------where FiscalQuartersFromCurrent between -1 and 0 --------and ga_channelgrouping = 'Paid Social'
-left join (select distinct * from `crowdriff-revops`.`bi_business`.`HSCampaignMapping`) as h  on ga_campaign = h.AdCampaignName 
-/*left join
-(select distinct * from `crowdriff-revops.bi_business.DGCampaignBudget`) as b  on h.HSCampaignName = b.HSCampaignName 
-and (FiscalQuarterEnd = b.QuarterEndDate or (b.QuarterEndDate is null and coalesce(b.CampaignBudget,0) = 0))*/
- left join (select distinct * from `crowdriff-revops.bi_business.DG_Qtr_CampaignBudget` where FiscalQuarterEnd is not null) as b on b.HSCampaignName = h.HSCampaignName   and b.FiscalQuarterEnd = d.FiscalQuarterEnd 
-  left join (select distinct * from `crowdriff-revops.bi_business.DG_Qtr_CampaignBudget` where FiscalQuarterEnd is null and coalesce(Budget_CAD,0) = 0) as b2 on b2.HSCampaignName = h.HSCampaignName and b.FiscalQuarterEnd is null
+left join campaign_breakdown as h  on ga_campaign = h.AdCampaignName 
 where CalendarDate < '2023-07-01'
-group by 
-----date(ga_date), 
+group by  
 ga_channelgrouping,
-/*case when ga_country in ('Canada', 'United States') then 'NORTH AMERICA'
-when ga_country in ('Bahrain', 'Egypt', 'Iran', 'Iraq', 'Jordan', 'Israel', 'Kuwait','Lebanon','Oman', 
-'Palestine', 'Qatar','Saudi Arabia', 'Syria','United Arab Emirates', 'Yemen') then 'ME & AFRICA'
-when ga_country in ('Cyprus', 'Turkey') then 'EUROPE'
-when ga_continent = 'Africa' then 'ME & AFRICA'
-when ga_continent = '(not set)' then 'Unknown'
-else Upper(ga_continent) end,*/
 Coalesce(ReportingRegion,'Other'),
 Case when Coalesce(Country,ga_country) in ('United States', 'Canada', 'United Kingdom') then Coalesce(Country,ga_country) else 'Other' end,
--------Case when ReportingRegion in ('NORTH AMERICA','EUROPE','OCEANIA') then Coalesce(Country,ga_country) else 'Other' end, 
 ga_campaign, 
 Trim(Case when  lower(GA_ChannelGrouping) = 'referral' then 
     Case when REGEXP_CONTAINS(lower(GA_Sourcemedium), '(linkedin|facebook|instagram|google|youtube|crowdriff|localhood|uberflip)')   then GA_Sourcemedium 
@@ -1959,7 +1696,6 @@ Trim(Case when  lower(GA_ChannelGrouping) = 'referral' then
     Case when REGEXP_CONTAINS(lower(GA_Sourcemedium), '(linkedin|facebook|instagram|google|youtube|crowdriff|localhood|uberflip)')   then SPLIT(ga_sourcemedium, '/')[OFFSET(0)] 
     else 'xxxxx' end else SPLIT(ga_sourcemedium, '/')[OFFSET(0)] end),
 Trim(SPLIT(ga_sourcemedium, '/')[OFFSET(1)]),
------ga_sourcemedium,
 CalendarWeekStart, 
 CalendarWeekEnd,  
 CalendarMonthStart,
@@ -1975,35 +1711,12 @@ FiscalQuartersfromCurrent,
 IsCalendarWeekEndDate, 
 IsCalendarWeekEnd, 
 Latest_GA_Day,
- Case when h.HSCampaignName is not null then h.HSCampaignName
-when lower(ga_campaign) like '%event%' and lower(ga_campaign) like '%mqp%' then 'Other Events'
-when lower(ga_campaign) like '%demo%' or lower(ga_campaign) like '%pricing%' then 'Other Demo Requests' 
-when lower(ga_campaign) like '%ebook%' or  lower(ga_campaign) like '%download%' or lower(ga_campaign) like '%content%'  or lower(ga_campaign) like '%resources%' or  lower(ga_campaign) like '%report%' or  lower(ga_campaign) like '%masterclass%' or lower(ga_campaign) like '%webinar recording%' or lower(ga_campaign) like '%guide%' then 'Other Content Downloads' 
-when lower(ga_campaign) like '%webinar%' or lower(ga_campaign) like '%registration form%' then 'Other Webinar Registrations'
-when lower(ga_campaign) like '%contact us%' then 'Contact Us' end ,
-
-  Case when h.HSCampaignName is not null then h.HSCampaignType
-when lower(ga_campaign) like '%event%' and lower(ga_campaign) like '%mqp%' then 'BOFU'
-when lower(ga_campaign) like '%demo%' or lower(ga_campaign) like '%pricing%' then 'BOFU' 
-when lower(ga_campaign) like '%ebook%' or  lower(ga_campaign) like '%download%' or lower(ga_campaign) like '%content%'  or lower(ga_campaign) like '%resources%' or  lower(ga_campaign) like '%report%' or  lower(ga_campaign) like '%masterclass%' or lower(ga_campaign) like '%webinar recording%' or lower(ga_campaign) like '%guide%' then 'MOFU' 
-when lower(ga_campaign) like '%webinar%' or lower(ga_campaign) like '%registration form%' then 'MOFU'
-when lower(ga_campaign) like '%contact us%' then 'BOFU' end ,
-
-Case when coalesce(b.HSCampaignName,b2.HSCampaignName) is not null then 1 
-when (lower(ga_campaign) like '%event%' and lower(ga_campaign) like '%mqp%') or
-lower(ga_campaign) like '%demo%' or lower(ga_campaign) like '%pricing%' or
-lower(ga_campaign) like '%ebook%' or  lower(ga_campaign) like '%download%' or lower(ga_campaign) like '%content%'  or lower(ga_campaign) like '%resources%' or  lower(ga_campaign) like '%report%' or  lower(ga_campaign) like '%masterclass%' or lower(ga_campaign) like '%webinar recording%' or lower(ga_campaign) like '%guide%' or
-lower(ga_campaign) like '%webinar%' or lower(ga_campaign) like '%registration form%' or
-lower(ga_campaign) like '%contact us%' then 1
-end ,
-b.FiscalQuarterEnd ,
-coalesce(b.ProductLine,b2.ProductLine, 'UnMatched') ,
-Case when coalesce(b.stage,b2.stage) is not null then coalesce(b.stage,b2.stage)
-when lower(ga_campaign) like '%event%' and lower(ga_campaign) like '%mqp%' then 'BOFU'
-when lower(ga_campaign) like '%demo%' or lower(ga_campaign) like '%pricing%' then 'BOFU' 
-when lower(ga_campaign) like '%ebook%' or  lower(ga_campaign) like '%download%' or lower(ga_campaign) like '%content%'  or lower(ga_campaign) like '%resources%' or  lower(ga_campaign) like '%report%' or  lower(ga_campaign) like '%masterclass%' or lower(ga_campaign) like '%webinar recording%' or lower(ga_campaign) like '%guide%' then 'MOFU' 
-when lower(ga_campaign) like '%webinar%' or lower(ga_campaign) like '%registration form%' then 'MOFU'
-when lower(ga_campaign) like '%contact us%' then 'BOFU' end  )
+h.CampaignName,
+h.CampaignType,
+h.IsTrackedCampaign,
+h.CampaignQuarterEndDate,
+h.CampaignProductLine,
+h.CampaignStage)
 
 Select 
  CalendarWeekStart, 
@@ -2018,7 +1731,6 @@ Fiscalyyyy,
 CalendarWeeksFromCurrent,
 CalendarMonthsFromCurrent,
 FiscalQuartersfromCurrent, 
-------date(ga_date) as date, 
 Case 
  when lower(GA_Medium) like '%direct%' or lower(GA_source) like '%direct%'or lower(GA_source) like '%website%'  or lower(GA_Medium) like '%website%'   or lower(GA_Medium) like 'platform' or lower(GA_source) like '%crowdriff%'  or lower(GA_source) like '%localhood%' or lower(GA_source) like '%uberflip%'  or lower(GA_source) like '%webinar%' or lower(GA_source) like '%website%'  or lower(GA_Medium) like '%website%' or  lower(GA_source) like '%drift%' or  lower(GA_source) like 'ebook%' or lower(GA_source) like 'event%' or lower(GA_Medium) like 'notification%'
  then 'Direct'
@@ -2047,12 +1759,8 @@ when lower(GA_Medium) in ('paidvideo' ) then 'Video Paid'
 
 when regexp_contains(lower(GA_Medium), r'^(display|banner|expandable|interstitial|cpm)$') or lower(GA_source) like 'display%'
             then 'Display'
-
-------when lower(GA_source) in ('google', 'bing', 'baidu') and lower(GA_Medium) in ('ppc',  'cpc') then "Paid Search" --- search_paid
  when regexp_contains(lower(GA_Medium), r'^(.*cp.*|ppc|retargeting|paid.*)$') or lower(GA_source) in ('ppc', 'cpc') or lower(GA_medium) in ('ppc', 'cpc')
             then 'Paid Search'
-
-----when lower(GA_source) in ('ppc',  'cpc') or lower(GA_Medium) in ('ppc',  'cpc') or lower(GA_Medium) like 'paid%' or lower(GA_source) like 'paid%' then "Other Paid" --- other_paid
 
 when regexp_contains(lower(GA_Medium), r'^(.*shop.*)$') then 'Organic Shopping'
         
@@ -2082,13 +1790,6 @@ when lower(GA_Medium) like '%referral%' or lower(GA_source) like '%uberflip%' or
 when lower(GA_Medium) like '%affiliate%' or lower(GA_Medium) like '%sponsor%' or  lower(GA_source) like 'sponsor%'or lower(GA_Medium) like 'article%' or lower(GA_source) like 'article%' or lower(GA_Medium) like 'skift%' or lower(GA_source) like 'skift%' or  lower(GA_source) like '%simpleview%' or  lower(GA_Medium) like '%simpleview%' or  lower(GA_source) like '%partner%' or  lower(GA_Medium) like '%event%'  or  lower(GA_source) like '%event%' then 'Referral'
   
  when  lower(GA_medium) like '%not set%' then 'Direct'    
-       /* when GA_medium = 'audio'
-            then 'audio'
-        when GA_medium = 'sms'
-            then 'sms'
-        when ends_with(GA_medium, 'push')
-            or regexp_contains(GA_medium, r'.*(mobile|notification).*')
-            then 'mobile_push'*/
 else 'Other'
 end as GA_ChannelGrouping,
 ReportRegion,
@@ -2140,17 +1841,9 @@ Fiscalyyyy,
 CalendarWeeksFromCurrent,
 CalendarMonthsFromCurrent,
 FiscalQuartersfromCurrent, 
-------date(ga_date) as date, 
 start_channel_grouping as GA_ChannelGrouping,
-/*case when ga_country in ('Canada', 'United States') then 'NORTH AMERICA'
-  when ga_country in ('Bahrain', 'Egypt', 'Iran', 'Iraq', 'Jordan', 'Israel', 'Kuwait','Lebanon','Oman', 
-'Palestine', 'Qatar','Saudi Arabia', 'Syria','United Arab Emirates', 'Yemen') then 'ME & AFRICA'
-  when ga_country in ('Cyprus', 'Turkey') then 'EUROPE'
-  when ga_continent = 'Africa' then 'ME & AFRICA'
-  when ga_continent = '(not set)' then 'Unknown'
-  else Upper(ga_continent) end as ReportRegion,*/
 Coalesce(ReportingRegion,'Other') as ReportRegion,
-Case when Coalesce(Country,geo_country) in ('United States', 'Canada', 'United Kingdom') then Coalesce(Country,geo_country) else 'Other' end as Country, ---------ReportingRegion in ('NORTH AMERICA','EUROPE','OCEANIA') then Coalesce(Country,ga_country) else 'Other' end as Country, 
+Case when Coalesce(Country,geo_country) in ('United States', 'Canada', 'United Kingdom') then Coalesce(Country,geo_country) else 'Other' end as Country,  
 start_campaign_name as GA_Campaign, 
 Trim(Case when start_channel_grouping like '%referral%' then 
     Case when REGEXP_CONTAINS(lower(start_source), '(linkedin|facebook|instagram|google|youtube|crowdriff|localhood|uberflip)')   then start_source||" / "||start_medium 
@@ -2165,65 +1858,25 @@ sum(engaged_time_seconds) as Duration,
 count(distinct user_pseudo_id) as Users, 
 sum(first_visit_count) as NewUsers,
 Latest_GA_Day,
- Case when h.HSCampaignName is not null then h.HSCampaignName
-when lower(start_campaign_name) like '%event%' and lower(start_campaign_name) like '%mqp%' then 'Other Events'
-when lower(start_campaign_name) like '%demo%' or lower(start_campaign_name) like '%pricing%' then 'Other Demo Requests' 
-when lower(start_campaign_name) like '%ebook%' or  lower(start_campaign_name) like '%download%' or lower(start_campaign_name) like '%content%'  or lower(start_campaign_name) like '%resources%' or  lower(start_campaign_name) like '%report%' or  lower(start_campaign_name) like '%masterclass%' or lower(start_campaign_name) like '%webinar recording%' or lower(start_campaign_name) like '%guide%' then 'Other Content Downloads' 
-when lower(start_campaign_name) like '%webinar%' or lower(start_campaign_name) like '%registration form%' then 'Other Webinar Registrations'
-when lower(start_campaign_name) like '%contact us%' then 'Contact Us' end as HSCampaignName,
-
-  Case when h.HSCampaignName is not null then h.HSCampaignType
-when lower(start_campaign_name) like '%event%' and lower(start_campaign_name) like '%mqp%' then 'BOFU'
-when lower(start_campaign_name) like '%demo%' or lower(start_campaign_name) like '%pricing%' then 'BOFU' 
-when lower(start_campaign_name) like '%ebook%' or  lower(start_campaign_name) like '%download%' or lower(start_campaign_name) like '%content%'  or lower(start_campaign_name) like '%resources%' or  lower(start_campaign_name) like '%report%' or  lower(start_campaign_name) like '%masterclass%' or lower(start_campaign_name) like '%webinar recording%' or lower(start_campaign_name) like '%guide%' then 'MOFU' 
-when lower(start_campaign_name) like '%webinar%' or lower(start_campaign_name) like '%registration form%' then 'MOFU'
-when lower(start_campaign_name) like '%contact us%' then 'BOFU' end as HSCampaignType,
-
-Case when coalesce(b.HSCampaignName,b2.HSCampaignName) is not null then 1 
-when (lower(start_campaign_name) like '%event%' and lower(start_campaign_name) like '%mqp%') or
-lower(start_campaign_name) like '%demo%' or lower(start_campaign_name) like '%pricing%' or
-lower(start_campaign_name) like '%ebook%' or  lower(start_campaign_name) like '%download%' or lower(start_campaign_name) like '%content%'  or lower(start_campaign_name) like '%resources%' or  lower(start_campaign_name) like '%report%' or  lower(start_campaign_name) like '%masterclass%' or lower(start_campaign_name) like '%webinar recording%' or lower(start_campaign_name) like '%guide%' or
-lower(start_campaign_name) like '%webinar%' or lower(start_campaign_name) like '%registration form%' or
-lower(start_campaign_name) like '%contact us%' then 1
-end as IsTrackedCampaign,
-b.FiscalQuarterEnd as CampaignQuarterEndDate,
-coalesce(b.ProductLine,b2.ProductLine, 'UnMatched') as CampaignProductLine,
-Case when coalesce(b.Stage,b2.Stage) is not null then coalesce(b.Stage,b2.Stage)
-when lower(start_campaign_name) like '%event%' and lower(start_campaign_name) like '%mqp%' then 'BOFU'
-when lower(start_campaign_name) like '%demo%' or lower(start_campaign_name) like '%pricing%' then 'BOFU' 
-when lower(start_campaign_name) like '%ebook%' or  lower(start_campaign_name) like '%download%' or lower(start_campaign_name) like '%content%'  or lower(start_campaign_name) like '%resources%' or  lower(start_campaign_name) like '%report%' or  lower(start_campaign_name) like '%masterclass%' or lower(start_campaign_name) like '%webinar recording%' or lower(start_campaign_name) like '%guide%' then 'MOFU' 
-when lower(start_campaign_name) like '%webinar%' or lower(start_campaign_name) like '%registration form%' then 'MOFU'
-when lower(start_campaign_name) like '%contact us%' then 'BOFU' end as CampaignStage,
+h.CampaignName,
+h.CampaignType,
+h.IsTrackedCampaign,
+h.CampaignQuarterEndDate,
+h.CampaignProductLine,
+h.CampaignStage,
 sum(landing_page_view_count) as LandingPageViews,
 sum(clicks_count) as Clicks,
 sum(engaged_session_count) as EngagedSessions,
 sum(user_engagement_count) as UserEngagements,
 sum(generate_lead_count) as GeneratedLeads,
 
-
-
 FROM `crowdriff-revops`.`bi_business`.`ga4_analytics`,  tmp_extract_date
 join `crowdriff-revops.bi_business.calendar_standard` as d on CalendarDate = date(session_start_date)
 left join `crowdriff-revops.bi_business.CountryRegionCodes` as m on replace(replace(replace(geo_country,'&','and'),'St.','Saint'),".","") = Country 
----------------where FiscalQuartersFromCurrent between -1 and 0 --------and ga_channelgrouping = 'Paid Social'
-left join (select distinct * from `crowdriff-revops`.`bi_business`.`HSCampaignMapping`) as h  on start_campaign_name = h.AdCampaignName
-/*left join
-(select distinct * from `crowdriff-revops.bi_business.DGCampaignBudget`) as b  on h.HSCampaignName = b.HSCampaignName 
-and (FiscalQuarterEnd = b.QuarterEndDate or (b.QuarterEndDate is null and coalesce(b.CampaignBudget,0) = 0))*/
-  left join (select distinct * from `crowdriff-revops.bi_business.DG_Qtr_CampaignBudget` where FiscalQuarterEnd is not null) as b on b.HSCampaignName = h.HSCampaignName   and b.FiscalQuarterEnd = d.FiscalQuarterEnd 
-  left join (select distinct * from `crowdriff-revops.bi_business.DG_Qtr_CampaignBudget` where FiscalQuarterEnd is null and coalesce(Budget_CAD,0) = 0) as b2 on b2.HSCampaignName = h.HSCampaignName and b.FiscalQuarterEnd is null
-
+left join campaign_breakdown as h  on start_campaign_name = h.AdCampaignName
 where CalendarDate >= '2023-07-01' and user_session_id is not null
-group by 
-----date(ga_date), 
+group by  
 start_channel_grouping ,
-/*case when ga_country in ('Canada', 'United States') then 'NORTH AMERICA'
-  when ga_country in ('Bahrain', 'Egypt', 'Iran', 'Iraq', 'Jordan', 'Israel', 'Kuwait','Lebanon','Oman', 
-'Palestine', 'Qatar','Saudi Arabia', 'Syria','United Arab Emirates', 'Yemen') then 'ME & AFRICA'
-  when ga_country in ('Cyprus', 'Turkey') then 'EUROPE'
-  when ga_continent = 'Africa' then 'ME & AFRICA'
-  when ga_continent = '(not set)' then 'Unknown'
-  else Upper(ga_continent) end as ReportRegion,*/
 Coalesce(ReportingRegion,'Other') ,
 Case when Coalesce(Country,geo_country) in ('United States', 'Canada', 'United Kingdom') then Coalesce(Country,geo_country) else 'Other' end,
 start_campaign_name , 
@@ -2234,7 +1887,6 @@ Trim(Case when start_channel_grouping like '%referral%' then
     Case when REGEXP_CONTAINS(lower(start_source), '(linkedin|facebook|instagram|google|youtube|crowdriff|localhood|uberflip)')   then start_source 
     else 'xxxxx' end else start_source  end) ,
 start_medium ,
------ga_sourcemedium,
 CalendarWeekStart, 
 CalendarWeekEnd,  
 CalendarMonthStart,
@@ -2250,235 +1902,9 @@ FiscalQuartersfromCurrent,
 IsCalendarWeekEndDate, 
 IsCalendarWeekEnd, 
 Latest_GA_Day,
- Case when h.HSCampaignName is not null then h.HSCampaignName
-when lower(start_campaign_name) like '%event%' and lower(start_campaign_name) like '%mqp%' then 'Other Events'
-when lower(start_campaign_name) like '%demo%' or lower(start_campaign_name) like '%pricing%' then 'Other Demo Requests' 
-when lower(start_campaign_name) like '%ebook%' or  lower(start_campaign_name) like '%download%' or lower(start_campaign_name) like '%content%'  or lower(start_campaign_name) like '%resources%' or  lower(start_campaign_name) like '%report%' or  lower(start_campaign_name) like '%masterclass%' or lower(start_campaign_name) like '%webinar recording%' or lower(start_campaign_name) like '%guide%' then 'Other Content Downloads' 
-when lower(start_campaign_name) like '%webinar%' or lower(start_campaign_name) like '%registration form%' then 'Other Webinar Registrations'
-when lower(start_campaign_name) like '%contact us%' then 'Contact Us' end ,
-
-  Case when h.HSCampaignName is not null then h.HSCampaignType
-when lower(start_campaign_name) like '%event%' and lower(start_campaign_name) like '%mqp%' then 'BOFU'
-when lower(start_campaign_name) like '%demo%' or lower(start_campaign_name) like '%pricing%' then 'BOFU' 
-when lower(start_campaign_name) like '%ebook%' or  lower(start_campaign_name) like '%download%' or lower(start_campaign_name) like '%content%'  or lower(start_campaign_name) like '%resources%' or  lower(start_campaign_name) like '%report%' or  lower(start_campaign_name) like '%masterclass%' or lower(start_campaign_name) like '%webinar recording%' or lower(start_campaign_name) like '%guide%' then 'MOFU' 
-when lower(start_campaign_name) like '%webinar%' or lower(start_campaign_name) like '%registration form%' then 'MOFU'
-when lower(start_campaign_name) like '%contact us%' then 'BOFU' end,
-
-Case when coalesce(b.HSCampaignName,b2.HSCampaignName) is not null then 1 
-when (lower(start_campaign_name) like '%event%' and lower(start_campaign_name) like '%mqp%') or
-lower(start_campaign_name) like '%demo%' or lower(start_campaign_name) like '%pricing%' or
-lower(start_campaign_name) like '%ebook%' or  lower(start_campaign_name) like '%download%' or lower(start_campaign_name) like '%content%'  or lower(start_campaign_name) like '%resources%' or  lower(start_campaign_name) like '%report%' or  lower(start_campaign_name) like '%masterclass%' or lower(start_campaign_name) like '%webinar recording%' or lower(start_campaign_name) like '%guide%' or
-lower(start_campaign_name) like '%webinar%' or lower(start_campaign_name) like '%registration form%' or
-lower(start_campaign_name) like '%contact us%' then 1
-end ,
-b.FiscalQuarterEnd ,
-coalesce(b.ProductLine,b2.ProductLine,'UnMatched') ,
-Case when coalesce(b.Stage,b2.Stage) is not null then coalesce(b.Stage,b2.Stage)
-when lower(start_campaign_name) like '%event%' and lower(start_campaign_name) like '%mqp%' then 'BOFU'
-when lower(start_campaign_name) like '%demo%' or lower(start_campaign_name) like '%pricing%' then 'BOFU' 
-when lower(start_campaign_name) like '%ebook%' or  lower(start_campaign_name) like '%download%' or lower(start_campaign_name) like '%content%'  or lower(start_campaign_name) like '%resources%' or  lower(start_campaign_name) like '%report%' or  lower(start_campaign_name) like '%masterclass%' or lower(start_campaign_name) like '%webinar recording%' or lower(start_campaign_name) like '%guide%' then 'MOFU' 
-when lower(start_campaign_name) like '%webinar%' or lower(start_campaign_name) like '%registration form%' then 'MOFU'
-when lower(start_campaign_name) like '%contact us%' then 'BOFU' end );
-
-
-
-
- ---- ga4_attribution_model.sql
-/*
-First-Click, Last-Click, Even-Click and Time Decay Attribution for GA4
-Replace "event_name in ('Contact Us','Contact Us Clicked','CTA Pressed','Form Submitted')" with the name(s) of your conversion event in lines 54, 57, 61 and 76
-*//*
-WITH
-  events AS (
-  SELECT
-    event_timestamp as event_ts,
-    user_pseudo_id AS user_pseudo_id,
-    user_id,
-    traffic_source.name as channel,	
-    traffic_source.medium as medium,	
-    traffic_source.source as source,	
-    event_name,
-    (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS session_id,
-    (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_number') AS session_number,
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_referrer') AS referrer,
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location') AS page_path,
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE event_name = 'page_view' AND key = 'page_title') AS page_title,
-    device.category as device_category,
-    device.operating_system,
-    device.language,
-    device.is_limited_ad_tracking,
-    device.web_info.browser,
-    device.web_info.hostname,
-    geo.continent,	
-    geo.country,
-    geo.region,	
-    geo.city
-  FROM
-    `ra-development.analytics_277223877.events_*` -- modify to your project
-    ),
-  id_stitching as (
-  SELECT 
-    DISTINCT user_pseudo_id as user_pseudo_id,
-    LAST_VALUE(user_id ignore nulls) OVER (
-            partition by user_pseudo_id
-            order by event_ts
-            ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-        ) AS user_id,
-    MIN(event_ts) OVER (
-            PARTITION BY user_pseudo_id
-        ) AS first_seen_at,
-    MAX(event_ts) OVER (
-            PARTITION BY user_pseudo_id
-        ) AS last_seen_at
-   FROM 
-    events),
-  sessions AS (
-  SELECT
-    *
-  FROM
-    events
-  WHERE
-    event_name = 'session_start' ),
-  user_stitched_sessions as (
-  SELECT
-        sessions.*,
-        coalesce(id_stitching.user_id, sessions.user_pseudo_id) as blended_user_id
-  FROM sessions
-  LEFT JOIN id_stitching using (user_pseudo_id)
-  ),
-  sessions_with_start_end_times AS (
-  SELECT
-    * EXCEPT (event_ts),
-    TIMESTAMP_MICROS(event_ts) AS session_start_ts,
-    CAST(LEAD(TIMESTAMP_MICROS(event_ts),1) OVER (PARTITION BY CONCAT(blended_user_id)
-      ORDER BY
-        event_ts) AS timestamp) AS session_end_ts
-  FROM
-    user_stitched_sessions ),
-  converting_events AS (
-  SELECT
-      coalesce(id_stitching.user_id, events.user_pseudo_id) as blended_user_id,
-      FIRST_VALUE(CASE WHEN event_name in ('Contact Us','Contact Us Clicked','CTA Pressed','Form Submitted') THEN session_id END) OVER (PARTITION BY coalesce(id_stitching.user_id, events.user_pseudo_id) ORDER BY event_ts ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as session_id,
-      1 AS count_conversions,
-      event_name,
-      CAST(TIMESTAMP_MICROS(MIN(CASE WHEN event_name in ('Contact Us','Contact Us Clicked','CTA Pressed','Form Submitted') THEN event_ts END ) OVER (PARTITION BY coalesce(id_stitching.user_id, events.user_pseudo_id))) as timestamp) AS converted_ts,
-    FROM
-      events
-    LEFT JOIN id_stitching using (user_pseudo_id)
-    WHERE
-      event_name in ('Contact Us','Contact Us Clicked','CTA Pressed','Form Submitted')),
-  converting_sessions AS (
-  SELECT
-    *
-  FROM
-    converting_events
-  GROUP BY
-    1,
-    2,
-    3,
-    4,
-    5 ),
-  converting_sessions_deduped AS (
-  SELECT
-    blended_user_id AS blended_user_id,
-    MAX(CASE
-        WHEN event_name in ('Contact Us','Contact Us Clicked','CTA Pressed','Form Submitted') THEN session_id
-    END
-      ) AS session_id,
-    MIN(converted_ts) AS converted_ts
-  FROM
-    converting_sessions
-  GROUP BY
-    1 ),
-  converting_sessions_deduped_labelled AS (
-  SELECT
-    c.blended_user_id,
-    s.session_start_ts,
-    s.session_end_ts,
-    c.converted_ts,
-    s.session_id AS session_id,
-    s.session_number AS session_seq,
-    CASE
-      WHEN (c.converted_ts BETWEEN s.session_start_ts AND coalesce(s.session_end_ts, current_timestamp)) THEN TRUE
-    ELSE
-    FALSE
-  END
-    AS conversion_session,
-    CASE
-      WHEN (c.converted_ts BETWEEN s.session_start_ts AND coalesce(s.session_end_ts, current_timestamp)) THEN 1
-    ELSE
-    0
-  END
-    AS event,
-    source,
-    medium,
-    channel,
-    referrer,
-    page_path,
-    device_category,
-    operating_system,
-    LANGUAGE,
-    is_limited_ad_tracking,
-    browser,
-    hostname,
-    continent,
-    country,
-    region,
-    city
-  FROM
-    sessions_with_start_end_times s
-  JOIN
-    converting_sessions_deduped c
-  ON
-    c.blended_user_id = s.blended_user_id
-  WHERE
-    c.converted_ts >= s.session_start_ts
-  ORDER BY
-    c.blended_user_id,
-    s.session_start_ts),
-  session_attrib_pct AS (
-  SELECT
-    *,
-    CASE
-      WHEN session_id = LAST_VALUE(session_id) OVER (PARTITION BY blended_user_id ORDER BY session_start_ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) THEN 1
-    ELSE
-    0
-  END
-    AS LAST_click_attrib_pct,
-    CASE
-      WHEN session_id = FIRST_VALUE(session_id) OVER (PARTITION BY blended_user_id ORDER BY session_start_ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) THEN 1
-    ELSE
-    0
-  END
-    AS first_click_attrib_pct,
-    1/COUNT(session_id) OVER (PARTITION BY blended_user_id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS even_click_attrib_pct,
-    CASE
-      WHEN session_start_ts = FIRST_VALUE(session_start_ts) OVER (PARTITION BY blended_user_id ORDER BY session_start_ts ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AND MAX(event) OVER (PARTITION BY blended_user_id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) = 1 THEN 1.1-ROW_NUMBER() OVER (PARTITION BY blended_user_id)
-      WHEN session_start_ts > LAG(session_start_ts) OVER (PARTITION BY blended_user_id ORDER BY session_start_ts)
-    AND MAX(event) OVER (PARTITION BY blended_user_id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) = 1 THEN ROUND(1.1-1/ROW_NUMBER() OVER (PARTITION BY blended_user_id), 2)
-    ELSE
-    NULL
-  END
-    AS weights
-  FROM
-    converting_sessions_deduped_labelled),
-  session_attrib_pct_with_time_decay AS (
-  SELECT
-    *,
-    ROUND(CASE
-        WHEN (weights=0 OR SUM(weights) OVER (PARTITION BY blended_user_id)=0) THEN 0
-      ELSE
-      weights/SUM(weights) OVER (PARTITION BY blended_user_id)
-    END
-      , 2) AS time_decay_attrib_pct
-  FROM
-    session_attrib_pct)
-SELECT
-  * EXCEPT (event,
-    weights,
-    converted_ts)
-FROM
-  session_attrib_pct_with_time_decay
-ORDER BY
-  blended_user_id,
-  session_start_ts*/
+h.CampaignName,
+h.CampaignType,
+h.IsTrackedCampaign,
+h.CampaignQuarterEndDate,
+h.CampaignProductLine,
+h.CampaignStage );
