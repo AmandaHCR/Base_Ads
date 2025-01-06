@@ -1,3 +1,5 @@
+/* Original Scheduled Query: BI_Business_ EOD_Ad_Analytics */
+
 /* Recreates data for Marketing Ads and GA Universal traffic
 `crowdriff-revops`.`bi_business`.`HSCampaignMapping` - external - googlesheets
 `crowdriff-revops`.`bi_business`.`DG_Qtr_CampaignBudget`
@@ -20,7 +22,7 @@ INSERT
 
 Select 
 HSCampaignName,
-"HS "||CampaignType as CamapignType,	
+"HS "||CampaignType as CampaignType,	
 coalesce(ProductLine, "UGC") as ProductLine,	
 Stage,	
 b.Fiscalyyyyq,
